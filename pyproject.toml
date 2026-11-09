@@ -1,0 +1,14 @@
+[project]
+name = "replan-copilot"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic[bedrock]>=2.6.0",
+    "ortools>=9.10",
+]
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
