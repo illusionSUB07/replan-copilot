@@ -14,4 +14,15 @@ uv run python -m copilot            # baselines
 uv run python -m copilot --agent    # add the Claude copilot (needs AWS credentials, see copilot/agent.py)
 ```
 
+## Replay view
+
+`web/index.html` plays back one simulated day: planned vs actual sequence, disruptions as they become known (including revised supplier estimates), the decision at each check and the running cost against "never replan".
+
+```bash
+uv run python -m copilot --export web/replay.json --seed 4 --policy expected   # policies: expected, greedy, never, always
+python -m http.server -d web                                                   # open http://localhost:8000
+```
+
+The page also accepts a dropped or selected replay JSON. Each check carries a `reason` string generated from the numbers; a local run can overwrite it with the copilot's own sentence.
+
 All data, costs and plant parameters are synthetic.

@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Replan Replay</title>
+<style>
+:root {
+  --bg: #f6f6f3; --panel: #ffffff; --fg: #1f2024; --muted: #6d6f78; --faint: #c9cad1; --grid: #e7e7ea;
+  --ok: #3f8f6b; --late: #d18b1f; --oos: #c9473d; --accent: #3a68d4; --sup: #7b5bc4; --sup2: #4f2fa0; --stop: #7c8191;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15161a; --panel: #1d1f24; --fg: #e8e8ec; --muted: #9a9ca6; --faint: #4a4c55; --grid: #2b2d33;
+    --ok: #5cba8f; --late: #e6a23c; --oos: #e8675c; --accent: #6f95f0; --sup: #a184e6; --sup2: #c9b5ff; --stop: #9ea3b3;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1280px; margin: 0 auto; padding: 14px 20px; display: grid; gap: 10px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+h1 { font-size: 20px; margin: 0; font-weight: 600; }
+.sub { color: var(--muted); font-size: 13px; }
+.panel { background: var(--panel); border-radius: 10px; padding: 10px 14px; }
+.title { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: flex; gap: 14px; align-items: center; }
+.legend span::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; background: var(--c); border: 1px solid var(--b, var(--c)); }
+.legend { text-transform: none; letter-spacing: 0; display: flex; gap: 12px; margin-left: auto; }
+svg { display: block; width: 100%; height: auto; }
+svg text { fill: var(--fg); font-size: 11px; }
+svg .muted { fill: var(--muted); }
+.costs { display: flex; gap: 22px; align-items: flex-end; }
+.cost b { display: block; font-size: 26px; font-variant-numeric: tabular-nums; font-weight: 600; line-height: 1.1; }
+.cost small { color: var(--muted); font-size: 12px; }
+.cost .bar { height: 4px; border-radius: 2px; background: var(--c); margin-top: 4px; transition: width .2s; }
+.delta { font-size: 13px; color: var(--muted); padding-bottom: 6px; }
+.delta b { color: var(--fg); }
+.card { display: grid; grid-template-columns: 210px 1fr 1fr 1.3fr; gap: 14px; align-items: stretch; min-height: 132px; }
+.card .when b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+.badge { display: inline-block; margin-top: 6px; padding: 3px 10px; border-radius: 99px; font-weight: 600; font-size: 13px; border: 1.5px solid var(--muted); color: var(--muted); }
+.badge.release { background: var(--accent); border-color: var(--accent); color: #fff; }
+.opt { border: 1.5px solid var(--grid); border-radius: 8px; padding: 8px 10px; font-variant-numeric: tabular-nums; }
+.opt.chosen { border-color: var(--accent); }
+.opt h3 { margin: 0 0 2px; font-size: 13px; font-weight: 600; }
+.opt .big { font-size: 22px; font-weight: 600; }
+.opt .row { color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; }
+.reason { font-size: 14px; }
+.reason .stress { margin-top: 8px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.controls { display: flex; align-items: center; gap: 12px; }
+.controls input[type=range] { flex: 1; accent-color: var(--accent); }
+button, select, .file { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--faint); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+#play { width: 84px; }
+#clock { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 92px; }
+.file input { display: none; }
+#msg { color: var(--muted); }
+body.drag main { outline: 2px dashed var(--accent); outline-offset: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>When should the plant replan?</h1>
+      <div class="sub" id="sub">Synthetic car plant · body shop → two paint lines → assembly</div>
+    </div>
+    <div class="costs" id="costs"></div>
+  </header>
+
+  <section class="panel">
+    <div class="title">Assembly line · planned slot (ghost) vs actually built
+      <div class="legend">
+        <span style="--c:var(--ok)">on time</span><span style="--c:var(--late)">late</span>
+        <span style="--c:var(--oos)">out of sequence</span><span style="--c:transparent;--b:var(--oos)">carried over</span>
+      </div>
+    </div>
+    <svg id="strip" viewBox="0 0 1240 128" role="img" aria-label="Assembly sequence: planned vs built"></svg>
+  </section>
+
+  <section class="panel">
+    <div class="title">Disruptions as they become known · checks</div>
+    <svg id="timeline" viewBox="0 0 1240 180" role="img" aria-label="Disruption timeline"></svg>
+  </section>
+
+  <section class="panel card" id="card" aria-live="polite"></section>
+
+  <div class="controls">
+    <button id="play" aria-label="Play or pause">▶ Play</button>
+    <span id="clock">--</span>
+    <input id="slider" type="range" step="1" aria-label="Time of day">
+    <select id="speed" aria-label="Playback speed">
+      <option value="15">15 min/s</option><option value="30" selected>30 min/s</option><option value="60">60 min/s</option>
+    </select>
+    <label class="file">Open JSON<input id="file" type="file" accept=".json,application/json"></label>
+    <span id="msg"></span>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const eur = v => Math.round(v).toLocaleString("en-US") + " €";
+let D, t = 0, t0 = 0, t1 = 1, playing = false;
+
+function clock(w, end) {
+  const L = D.plant.shift_len;
+  let d = Math.floor(w / L), m = w - d * L;
+  if (end && m === 0) { d--; m = L; }  // shift end reads 22:00, not next day 06:00
+  m += D.plant.shift_start;
+  return `D${d} ${String(Math.floor(m / 60)).padStart(2, "0")}:${String(Math.floor(m % 60)).padStart(2, "0")}`;
+}
+
+function load(data) {
+  D = data;
+  const firsts = [...D.disruptions.map(d => d.known_at), D.checks[0]?.time ?? D.plant.day_start];
+  t0 = Math.floor((Math.min(...firsts) - 30) / 60) * 60;
+  t1 = D.plant.day_end;
+  $("slider").min = t0; $("slider").max = t1;
+  $("sub").textContent = `Synthetic car plant · seed ${D.seed} · ${D.plan.length} cars at ${D.plant.takt}-min takt · policy: ${D.policy} vs never replan`;
+  $("msg").textContent = "";
+  seek(t0);
+}
+
+function seek(v) { t = Math.max(t0, Math.min(t1, v)); $("slider").value = Math.floor(t); render(); }
+
+function status(id) {
+  const o = D.outcome[id], p = D.plan.find(c => c.id === id);
+  if (o.actual_time == null) return "carried";
+  return o.out_of_sequence ? "oos" : o.actual_time > p.time ? "late" : "ok";
+}
+const COL = { ok: "var(--ok)", late: "var(--late)", oos: "var(--oos)", carried: "var(--oos)" };
+
+function renderStrip(now) {
+  const n = D.plan.length, x0 = 58, sw = (1236 - x0) / n, w = Math.max(3, sw - 2.5);
+  const x = p => x0 + p * sw;
+  let s = `<text x="0" y="35" class="muted">plan</text><text x="0" y="99" class="muted">built</text>`;
+  let lines = "", cars = "";
+  for (const p of D.plan) {
+    const o = D.outcome[p.id], st = status(p.id), built = o.actual_time != null && o.actual_time <= now;
+    const overdue = !built && p.time <= now;
+    const ghostStroke = st === "carried" && now >= t1 ? "var(--oos)" : overdue ? "var(--late)" : "var(--faint)";
+    cars += `<rect x="${x(p.pos)}" y="18" width="${w}" height="28" rx="2" fill="none" stroke="${ghostStroke}" stroke-width="1.2"
+      ${st === "carried" && now >= t1 ? 'stroke-dasharray="3 2"' : ""}><title>${p.id} · planned ${clock(p.time)} (slot ${p.pos + 1})</title></rect>`;
+    if (!built) continue;
+    const ax = x(o.actual_pos), moved = o.actual_pos !== p.pos;
+    if (moved) lines += `<line x1="${x(p.pos) + w / 2}" y1="47" x2="${ax + w / 2}" y2="81" stroke="${COL[st]}"
+      stroke-opacity="${st === "oos" ? .9 : .28}" stroke-width="${st === "oos" ? 1.4 : 1}"/>`;
+    cars += `<rect x="${ax}" y="82" width="${w}" height="28" rx="2" fill="${COL[st]}"><title>${p.id} · built ${clock(o.actual_time)}
+      (slot ${o.actual_pos + 1}, planned ${p.pos + 1}) · ${{ ok: "on time", late: `${o.actual_time - p.time} min late`, oos: "out of sequence" }[st]}</title></rect>`;
+  }
+  const builtN = D.plan.filter(p => D.outcome[p.id].actual_time != null && D.outcome[p.id].actual_time <= now).length;
+  const carried = D.plan.filter(p => status(p.id) === "carried").length;
+  const tail = now >= t1 && carried ? `${carried} cars carried over to tomorrow` : now < D.plant.day_start ? "line starts at " + clock(D.plant.day_start) : `${builtN} built`;
+  s += lines + cars + `<text x="1236" y="124" text-anchor="end" class="muted">${tail}</text>`;
+  if (builtN < n && now >= D.plant.day_start && now < t1) s += `<path d="M${x(builtN) + w / 2} 114 l-4 6 h8z" fill="var(--accent)"/>`;
+  $("strip").innerHTML = s;
+}
+
+function lanes() {
+  const out = new Map();
+  for (const d of D.disruptions) {
+    const key = { paint_stop: `Paint line ${d.line} stop`, body_stop: "Body shop stop", repaint: "Repaints",
+      supplier_late: `Supplier late: ${(d.option || "").replace("_", " ")}`, assembly_stop: "Assembly stop" }[d.type] || d.type;
+    if (!out.has(key)) out.set(key, []);
+    out.get(key).push(d);
+  }
+  return [...out];
+}
+
+function renderTimeline(now) {
+  const X0 = 170, X1 = 1230, X = v => X0 + (v - t0) / (t1 - t0) * (X1 - X0);
+  const ls = lanes(), lh = 28, axisY = 24 + ls.length * lh + 18;
+  $("timeline").setAttribute("viewBox", `0 0 1240 ${axisY + 22}`);
+  let s = `<rect x="${X(D.plant.day_start)}" y="6" width="${X(t1) - X(D.plant.day_start)}" height="${axisY - 6}" fill="var(--grid)" opacity=".45" rx="4"/>
+    <text x="${X(D.plant.day_start) + 6}" y="18" class="muted">assembly shift</text>`;
+  for (let v = Math.ceil(t0 / 120) * 120; v <= t1; v += 120)
+    s += `<line x1="${X(v)}" x2="${X(v)}" y1="${axisY}" y2="${axisY + 4}" stroke="var(--faint)"/>
+      <text x="${X(v)}" y="${axisY + 16}" text-anchor="${v === t1 ? "end" : "middle"}" class="muted">${clock(v, v === t1).slice(3)}</text>`;
+  ls.forEach(([name, ds], i) => {
+    const y = 26 + i * lh, seen = ds.filter(d => d.known_at <= now);
+    s += `<text x="0" y="${y + 13}" ${seen.length ? "" : 'class="muted" opacity=".5"'}>${name}</text>`;
+    ds.forEach((d, j) => {
+      if (d.known_at > now) return;
+      if (d.type === "supplier_late") {
+        if (j === 0) {
+          s += `<rect x="${X(d.known_at)}" y="${y + 2}" width="${X(d.until) - X(d.known_at)}" height="16" rx="3" fill="var(--sup)" opacity=".85"/>
+            <text x="${X(d.known_at) + 6}" y="${y + 14}" style="fill:#fff">estimate: parts by ${clock(d.until).slice(3)}</text>`;
+        } else {
+          const prev = ds[j - 1];
+          s += `<line x1="${X(prev.until)}" x2="${X(prev.until)}" y1="${y - 2}" y2="${y + 22}" stroke="var(--fg)" stroke-dasharray="2 2"/>
+            <rect x="${X(prev.until)}" y="${y + 2}" width="${X(d.until) - X(prev.until)}" height="16" rx="3" fill="var(--sup2)"/>
+            <text x="${X(d.until) + 6}" y="${y + 14}">revised at ${clock(d.known_at).slice(3)}: ${clock(d.until).slice(3)} (+${d.until - prev.until} min)</text>`;
+        }
+      } else if (d.type === "repaint") {
+        s += `<circle cx="${X(d.known_at)}" cy="${y + 10}" r="5" fill="var(--stop)"/><text x="${X(d.known_at) + 8}" y="${y + 14}">${d.order}</text>`;
+      } else {
+        s += `<rect x="${X(d.start)}" y="${y + 2}" width="${Math.max(3, X(d.end) - X(d.start))}" height="16" rx="3" fill="var(--stop)"/>
+          <text x="${X(d.end) + 6}" y="${y + 14}">${clock(d.start).slice(3)}–${clock(d.end).slice(3)}</text>`;
+      }
+    });
+  });
+  const cur = currentCheck(now);
+  for (const c of D.checks) {
+    const done = c.time <= now, rel = c.decision === "release", cx = X(c.time), cy = axisY - 6;
+    s += `<path d="M${cx} ${cy - 6} l6 6 l-6 6 l-6 -6z" fill="${done && rel ? "var(--accent)" : "var(--panel)"}"
+      stroke="${done ? (rel ? "var(--accent)" : "var(--fg)") : "var(--faint)"}" stroke-width="${c === cur ? 2.5 : 1.2}"><title>check ${clock(c.time)}: ${c.decision}</title></path>`;
+  }
+  s += `<line x1="${X(now)}" x2="${X(now)}" y1="4" y2="${axisY}" stroke="var(--accent)" stroke-width="1.5"/>`;
+  $("timeline").innerHTML = s;
+}
+
+const currentCheck = now => D.checks.filter(c => c.time <= now).at(-1);
+
+function renderCard(now) {
+  const c = currentCheck(now), next = D.checks.find(k => k.time > now);
+  if (!c) {
+    $("card").innerHTML = `<div class="when"><span class="sub">First check</span><b>${next ? clock(next.time) : "-"}</b></div>
+      <div class="reason" style="grid-column: span 3">At each check the copilot predicts the rest of the day from what is known
+      and compares two options: keep the plan, or release a resequenced plan to the line and suppliers.</div>`;
+    return;
+  }
+  const rel = c.decision === "release", o = c.options["0"];
+  const opt = (k, label) => {
+    const v = o[k], e = v.cost_eur;
+    return `<div class="opt ${(k === "resequence") === rel ? "chosen" : ""}"><h3>${label}</h3>
+      <div class="big">${eur(v.total_eur)}</div>
+      <div class="row"><span>${v.out_of_sequence} out of sequence</span><span>${eur(e.out_of_sequence)}</span></div>
+      <div class="row"><span>${v.carried_over} carried over</span><span>${eur(e.carried_over)}</span></div>
+      <div class="row"><span>${v.call_off_changes} call-offs + ${v.emergency_changes} emergency</span><span>${eur(e.call_offs)}</span></div>
+      <div class="row"><span>expected incl. supplier slip</span><span>${eur(c.expected_eur[k])}</span></div></div>`;
+  };
+  const stress = Object.keys(c.options).filter(g => g !== "0")
+    .map(g => `<span style="white-space:nowrap">+${g} min: ${eur(c.options[g].wait.total_eur)} / ${eur(c.options[g].resequence.total_eur)}</span>`).join(" · ");
+  $("card").innerHTML = `<div class="when"><span class="sub">Check</span><b>${clock(c.time)}</b>
+      <span class="badge ${rel ? "release" : ""}">${rel ? "Release new plan" : "Keep plan"}</span>
+      <div class="sub" style="margin-top:8px">${c.known.length} disruptions known${next ? ` · next ${clock(next.time).slice(3)}` : ""}</div></div>
+    ${opt("wait", "Keep plan")}${opt("resequence", "Release new plan")}
+    <div class="reason">${c.reason}<div class="stress">If the supplier slips further (keep / release):<br>${stress}</div></div>`;
+}
+
+function renderCosts(now) {
+  const f = D.final, max = Math.max(f.policy.total_eur, f.never.total_eur, 1);
+  const run = k => f[k].events.filter(e => e.t <= now).reduce((a, e) => a + e.eur, 0);
+  const a = run("policy"), b = run("never");
+  const box = (label, v, c) => `<div class="cost" style="--c:${c}"><small>${label}</small><b>${eur(v)}</b><div class="bar" style="width:${Math.round(150 * v / max)}px"></div></div>`;
+  $("costs").innerHTML = box(D.policy, a, "var(--accent)") + box("never replan", b, "var(--faint)") +
+    `<div class="delta">${b - a >= 0 ? "saved" : "extra"} <b>${eur(Math.abs(b - a))}</b>${now >= t1 ? " · final" : " so far"}</div>`;
+}
+
+function render() {
+  const now = Math.floor(t);
+  $("clock").textContent = clock(now, now === t1);
+  renderStrip(now); renderTimeline(now); renderCard(now); renderCosts(now);
+}
+
+let last = null;
+function tick(ts) {
+  if (!playing) return;
+  if (last != null) seek(t + (ts - last) / 1000 * +$("speed").value);
+  last = ts;
+  if (t >= t1) return setPlaying(false);
+  requestAnimationFrame(tick);
+}
+function setPlaying(p) {
+  if (!D) return;
+  if (p && t >= t1) seek(t0);
+  playing = p; last = null;
+  $("play").textContent = p ? "❚❚ Pause" : "▶ Play";
+  if (p) requestAnimationFrame(tick);
+}
+
+$("play").onclick = () => setPlaying(!playing);
+$("slider").oninput = e => seek(+e.target.value);
+document.addEventListener("keydown", e => {
+  if (!D || e.target.tagName === "SELECT") return;
+  if (e.code === "Space") { e.preventDefault(); setPlaying(!playing); }
+  const times = D.checks.map(c => c.time);
+  if (e.key === "ArrowRight") { e.preventDefault(); seek(times.find(v => v > Math.floor(t)) ?? t1); }
+  if (e.key === "ArrowLeft") { e.preventDefault(); seek(times.filter(v => v < Math.floor(t)).at(-1) ?? t0); }
+});
+
+function readFile(f) {
+  f.text().then(s => load(JSON.parse(s))).catch(err => $("msg").textContent = "Could not read file: " + err.message);
+}
+$("file").onchange = e => e.target.files[0] && readFile(e.target.files[0]);
+document.addEventListener("dragover", e => { e.preventDefault(); document.body.classList.add("drag"); });
+document.addEventListener("dragleave", () => document.body.classList.remove("drag"));
+document.addEventListener("drop", e => {
+  e.preventDefault(); document.body.classList.remove("drag");
+  if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
+});
+
+fetch("replay.json").then(r => r.json()).then(load)
+  .catch(() => $("msg").textContent = "Drop a replay.json here or use Open JSON.");
+</script>
+</body>
+</html>
