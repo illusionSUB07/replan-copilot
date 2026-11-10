@@ -19,10 +19,10 @@ uv run python -m copilot --agent    # add the Claude copilot (needs AWS credenti
 `web/index.html` plays back one simulated day: planned vs actual sequence, disruptions as they become known (including revised supplier estimates), the decision at each check and the running cost against "never replan".
 
 ```bash
-uv run python -m copilot --export web/replay.json --seed 4 --policy expected   # policies: expected, greedy, never, always
+uv run python -m copilot --export web/replay.json --seed 0 --policy agent      # policies: agent (Claude), expected, greedy, never, always
 python -m http.server -d web                                                   # open http://localhost:8000
 ```
 
-The page also accepts a dropped or selected replay JSON. Each check carries a `reason` string generated from the numbers; a local run can overwrite it with the copilot's own sentence.
+The page also accepts a dropped or selected replay JSON. Each check carries a `reason`: with `--policy agent` it is Claude's own closing sentence, otherwise it is generated from the numbers. The committed replay is day 0 decided by Claude.
 
 All data, costs and plant parameters are synthetic.
