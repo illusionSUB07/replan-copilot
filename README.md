@@ -25,4 +25,15 @@ python -m http.server -d web                                                   #
 
 The page also accepts a dropped or selected replay JSON. Each check carries a `reason`: with `--policy agent` it is Claude's own closing sentence, otherwise it is generated from the numbers. The committed replay is day 0 decided by Claude.
 
+## Omniverse scene
+
+`omniverse/build_stage.py` turns a replay into an OpenUSD stage (`.usda`, Z-up, meters) for Omniverse / Isaac Sim: body-shop hall, paint booths P1/P2, a buffer, an assembly line with 120 slot markers, named checkpoint gates (`/World/Gates/body_in|paint_in|assembly_in|finished`) and three cameras under `/World/Cameras`. Every order is a box in `/World/Cars` colored by its main option and animated along its simulated times (time code = working minute, the day plays in about 2 minutes); built cars stop at their actual slot, carried-over cars stay in the buffer. A transparent ghost in `/World/Ghosts` marks each order's planned slot from its planned time. Each car's `customData` holds order id, options, planned/actual position and the out-of-sequence flag.
+
+```bash
+uv run --group omniverse python -m omniverse.build_stage web/replay.json omniverse/out/plant.usda
+uv run --group omniverse pytest
+```
+
+The replay's `outcome` carries each car's times (`body_in`, `paint_in`, `paint_line`, `ready`, `assembly_in`, `finished`, `plan_time`); for cars moved by a release, plan position and time refer to the final plan.
+
 All data, costs and plant parameters are synthetic.

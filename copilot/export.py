@@ -45,8 +45,12 @@ def outcome(rows, disruptions, releases, day_end):
     events += [{"t": t, "eur": n * replan.CALL_OFF_CHANGE + e * replan.EMERGENCY_CHANGE,
                 "what": f"release: {n} call-off changes + {e} emergency"} for t, n, e in releases]
     events += [{"t": day_end, "eur": replan.CARRY_OVER, "what": f"{oid} carried over"} for oid in actual if oid not in built]
+    by_id = {r["order"].id: r for r in rows}
     cars = {oid: {"plan_pos": a["pos"], "actual_time": a.get("assembly_in"), "actual_pos": a.get("actual_pos"),
-                  "out_of_sequence": oid in oos} for oid, a in actual.items()}
+                  "out_of_sequence": oid in oos, "plan_time": by_id[oid]["assembly_in"],
+                  "paint_line": by_id[oid]["paint_line"], "body_in": a["body_in"], "paint_in": a["paint_in"],
+                  "ready": a["ready"], "assembly_in": a.get("assembly_in"), "finished": a.get("finished")}
+            for oid, a in actual.items()}
     return cars, sorted(events, key=lambda e: e["t"])
 
 

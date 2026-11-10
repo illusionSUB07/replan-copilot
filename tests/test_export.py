@@ -28,6 +28,9 @@ def test_export_is_consistent_with_run_day():
         assert sum(e["eur"] for e in f["events"]) == f["total_eur"]
     assert len(out["plan"]) == len(out["outcome"]) == len(ROWS)
     assert sum(c["out_of_sequence"] for c in out["outcome"].values()) == final["out_of_sequence"]
+    for c in out["outcome"].values():
+        assert c["body_in"] < c["paint_in"] < c["ready"] and c["assembly_in"] == c["actual_time"]
+        assert c["finished"] is None or c["ready"] <= c["assembly_in"] < c["finished"]
     never = export(ROWS, DIS, CHECKS, DAY, "never")
     assert never["final"]["policy"]["total_eur"] == never["final"]["never"]["total_eur"]
 
