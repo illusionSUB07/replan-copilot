@@ -148,9 +148,9 @@ def build(replay, out):
     stage.SetDefaultPrim(UsdGeom.Xform.Define(stage, "/World").GetPrim())
     stage.GetRootLayer().customLayerData = {"seed": d["seed"], "scenario": d["scenario"], "policy": d["policy"]}
 
-    looks = {"concrete": material(stage, "Concrete", (0.32, 0.32, 0.34), 0.9),
-             "zone": material(stage, "EpoxyZone", (0.2, 0.24, 0.3), 0.6),
-             "wall": material(stage, "Wall", (0.82, 0.83, 0.85), 0.8),
+    looks = {"concrete": material(stage, "Concrete", (0.2, 0.2, 0.22), 0.9),
+             "zone": material(stage, "EpoxyZone", (0.12, 0.17, 0.25), 0.6),
+             "wall": material(stage, "Wall", (0.55, 0.56, 0.6), 0.8),
              "steel": material(stage, "Steel", (0.45, 0.47, 0.5), 0.4, 0.8),
              "conveyor": material(stage, "Conveyor", (0.12, 0.12, 0.13), 0.5, 0.3),
              "safety": material(stage, "SafetyYellow", (0.95, 0.75, 0.05), 0.5),
@@ -179,9 +179,9 @@ def build(replay, out):
     look_at(stage, "/World/Cameras/end_of_line", (20, -70, 16), (90, -25, 0), 18)
     look_at(stage, "/World/Cameras/overview", (-40, -175, 150), (130, 0, 0), 22)
 
-    UsdLux.DomeLight.Define(stage, "/World/Lights/Dome").CreateIntensityAttr(350)
+    UsdLux.DomeLight.Define(stage, "/World/Lights/Dome").CreateIntensityAttr(160)
     sun = UsdLux.DistantLight.Define(stage, "/World/Lights/Sun")
-    sun.CreateIntensityAttr(1500)
+    sun.CreateIntensityAttr(1100)
     sun.CreateAngleAttr(2.0)
     sun.AddRotateXYZOp().Set(Gf.Vec3f(-35, 0, 40))
 

@@ -14,6 +14,7 @@ def parse_args():
     p.add_argument("--width", type=int, default=1280)
     p.add_argument("--height", type=int, default=720)
     p.add_argument("--subframes", type=int, default=4, help="path-tracing subframes per capture, removes ghosting")
+    p.add_argument("--camera", action="append", help="only these camera names (repeatable), default all")
     return p.parse_args()
 
 
@@ -32,7 +33,7 @@ def render(args):
         raise SystemExit(f"cannot open {args.usd}")
     stage = ctx.get_stage()
     root = stage.GetPrimAtPath("/World/Cameras")
-    cams = [p for p in Usd.PrimRange(root) if p.IsA(UsdGeom.Camera)] if root else []
+    cams = [p for p in Usd.PrimRange(root) if p.IsA(UsdGeom.Camera) and (not args.camera or p.GetName() in args.camera)] if root else []
     if not cams:
         raise SystemExit("no cameras under /World/Cameras")
 
