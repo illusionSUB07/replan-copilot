@@ -10,6 +10,7 @@ INSTANCE_TYPE="${INSTANCE_TYPE:-g6e.2xlarge}"
 ISAAC_TAG="${ISAAC_TAG:-6.2.0}"
 DISK_GB="${DISK_GB:-150}"
 MAX_HOURS="${MAX_HOURS:-4}"
+SUBNET_ID="${SUBNET_ID:-}"  # optional: pin an availability zone when one is out of capacity
 IDLE_MIN="${IDLE_MIN:-45}"
 NAME=replan-copilot-isaac-sim
 TAGS="{Key=Name,Value=$NAME},{Key=owner,Value=personal},{Key=project,Value=replan-copilot}"
@@ -137,7 +138,7 @@ EOF
 )
 
 id=$(aws ec2 run-instances --image-id "$ami" --instance-type "$INSTANCE_TYPE" --key-name "$KEY_NAME" \
-  --security-group-ids "$sg" --instance-initiated-shutdown-behavior stop \
+  --security-group-ids "$sg" ${SUBNET_ID:+--subnet-id "$SUBNET_ID"} --instance-initiated-shutdown-behavior stop \
   --metadata-options HttpTokens=required,HttpEndpoint=enabled \
   --block-device-mappings "DeviceName=$root_dev,Ebs={VolumeSize=$DISK_GB,VolumeType=gp3,DeleteOnTermination=true}" \
   --tag-specifications "ResourceType=instance,Tags=[$TAGS]" "ResourceType=volume,Tags=[$TAGS]" \

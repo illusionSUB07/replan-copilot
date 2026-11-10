@@ -74,3 +74,5 @@ rsync -av ubuntu@<ip>:work/frames/ ./frames/
 6. NVIDIA, Replicator Getting Started Scripts: https://docs.isaacsim.omniverse.nvidia.com/latest/replicator_tutorials/tutorial_replicator_getting_started.html
 7. NVIDIA, Isaac Sim Python Environment (standalone `SimulationApp`): https://docs.isaacsim.omniverse.nvidia.com/5.1.0/python_scripting/manual_standalone_python.html
 8. NGC catalog, Isaac Sim container: https://catalog.ngc.nvidia.com/orgs/nvidia/containers/isaac-sim
+
+If a zone is out of capacity (`InsufficientInstanceCapacity`), pin another one with `SUBNET_ID=<default subnet of that zone>` or try a different `INSTANCE_TYPE` (g6e is often short in eu-central-1; g6.4xlarge with an L4 worked as a fallback).
