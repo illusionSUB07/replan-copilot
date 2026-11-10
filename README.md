@@ -34,6 +34,12 @@ uv run --group omniverse python -m omniverse.build_stage web/replay.json omniver
 uv run --group omniverse pytest
 ```
 
+`omniverse/perceive.py` is the vision step: Claude counts cars by colour in rendered camera frames (buffer, finished yard, paint booths) and each count is compared with what the stage says is in that camera's area at that time.
+
+```bash
+uv run --group omniverse python -m omniverse.perceive FRAMES_DIR    # FRAMES_DIR/<camera>/<time code>.png, writes FRAMES_DIR/perception.json
+```
+
 The replay's `outcome` carries each car's times (`body_in`, `paint_in`, `paint_line`, `ready`, `assembly_in`, `finished`, `plan_time`); for cars moved by a release, plan position and time refer to the final plan.
 
 All data, costs and plant parameters are synthetic.
