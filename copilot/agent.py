@@ -29,7 +29,7 @@ stating your decision and the main reason."""
 
 def make_policy(disruptions, verbose=True):
     client = AnthropicBedrockMantle(aws_region=REGION, aws_profile=PROFILE, max_retries=6)
-    history = []
+    history, reasons = [], {}
 
     def policy(now, rows):
         decision = {"release": False}
@@ -83,9 +83,11 @@ def make_policy(disruptions, verbose=True):
         if final.stop_reason == "refusal":
             raise RuntimeError(f"model refused at {clock(now)}")
         text = " ".join(b.text for b in final.content if b.type == "text").strip()
+        reasons[now] = text
         history.append(f"- {clock(now)}: {'RELEASED' if decision['release'] else 'kept plan'} ({text[-300:]})")
         if verbose:
             print(history[-1])
         return decision["release"]
 
+    policy.reasons = reasons  # check time -> Claude's own explanation, used by the replay export
     return policy

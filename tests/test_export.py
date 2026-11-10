@@ -30,3 +30,9 @@ def test_export_is_consistent_with_run_day():
     assert sum(c["out_of_sequence"] for c in out["outcome"].values()) == final["out_of_sequence"]
     never = export(ROWS, DIS, CHECKS, DAY, "never")
     assert never["final"]["policy"]["total_eur"] == never["final"]["never"]["total_eur"]
+
+
+def test_short_keeps_only_claudes_decision_sentence():
+    from copilot.export import short
+    assert short("Numbers...\n\n**Decision:** keep it.\n- **Still open:** y") == "keep it."
+    assert short("just one line") == "just one line"

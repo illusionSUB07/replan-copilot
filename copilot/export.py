@@ -8,7 +8,20 @@ POLICIES = {
     "greedy": ("greedy rule", replan.greedy_rule),
     "never": ("never replan", lambda d: lambda now, rows: False),
     "always": ("always replan", lambda d: lambda now, rows: True),
+    "agent": ("claude copilot", lambda d: _agent(d)),
 }
+
+
+def short(text):
+    # Claude's closing decision sentence, without markdown, for the decision card
+    lines = [l.replace("**", "").strip(" -") for l in text.splitlines() if l.strip()]
+    last = next((l for l in reversed(lines) if l.startswith("Decision")), lines[-1] if lines else "")
+    return last.replace("**", "").replace("Decision:", "").strip()
+
+
+def _agent(disruptions):
+    from .agent import make_policy  # imported lazily: needs the anthropic SDK and AWS access
+    return make_policy(disruptions)
 
 
 def reason(policy, release, exp_wait, exp_reseq, wait, reseq):
@@ -40,7 +53,9 @@ def outcome(rows, disruptions, releases, day_end):
 def export(rows, disruptions, checks, day, policy="expected"):
     name, make = POLICIES[policy]
     trace = []
-    final, log = run_day(rows, disruptions, make(disruptions), checks, trace)
+    pol = make(disruptions)
+    final, log = run_day(rows, disruptions, pol, checks, trace)
+    own = getattr(pol, "reasons", {})  # the Claude agent explains its own decisions
     never, _ = run_day(rows, disruptions, lambda now, r: False, checks)
     day_start, day_end = day * plant.SHIFT_LEN, (day + 1) * plant.SHIFT_LEN
 
@@ -57,7 +72,7 @@ def export(rows, disruptions, checks, day, policy="expected"):
                                 "emergency_changes": c["emergency_changes"]} for k, c in e.items()} for g, e in ev.items()},
             "expected_eur": {"wait": round(exp_w), "resequence": round(exp_r)},
             "decision": "release" if release else "keep",
-            "reason": reason(name, release, exp_w, exp_r, ev[0]["wait"]["total_eur"], ev[0]["resequence"]["total_eur"]),
+            "reason": short(own[now]) if own.get(now) else reason(name, release, exp_w, exp_r, ev[0]["wait"]["total_eur"], ev[0]["resequence"]["total_eur"]),
         })
 
     final_rows = trace[-1][2] if trace else rows
