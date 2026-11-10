@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Variant-to-Sequence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Fraunces:opsz,wght@9..144,300;9..144,400&family=IBM+Plex+Mono:wght@400;500;600&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #f1ede3; --paper-2: #e8e3d6; --card: #f8f6f0; --ink: #17160f; --ink-2: #4b483e; --ink-3: #8a8576;
+  --rule: #d3ccba; --signal: #ff5b1f; --signal-ink: #c63d0b; --signal-soft: rgba(255, 91, 31, .11);
+  --ev: #2a67d8; --carbon: #17160f; --sunroof: #d99a00; --pilot: #0f9a6c; --plain: #cdc6b3;
+  --serif: "Instrument Serif", Georgia, serif; --num: "Fraunces", Georgia, serif; --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --sans: "Bricolage Grotesque", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.45;
+  min-height: 100vh; -webkit-font-smoothing: antialiased;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.09 0 0 0 0 0.08 0 0 0 0 0.06 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    linear-gradient(var(--rule) 1px, transparent 1px), linear-gradient(90deg, var(--rule) 1px, transparent 1px);
+  background-size: 160px 160px, 48px 48px, 48px 48px;
+  background-position: 0 0, -1px -1px, -1px -1px;
+}
+body::before { content: ""; position: fixed; inset: 0; background: radial-gradient(ellipse at 50% 40%, transparent 30%, var(--paper) 85%); pointer-events: none; }
+.wrap { position: relative; max-width: 1400px; margin: 0 auto; padding: 22px 40px 32px; }
+
+/* header */
+header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px; align-items: end; padding-bottom: 16px; border-bottom: 1.5px solid var(--ink); }
+.kicker { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); display: flex; gap: 14px; align-items: center; }
+.kicker i { width: 28px; height: 1.5px; background: var(--signal); display: inline-block; }
+h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(40px, 4.4vw, 64px); line-height: .92; letter-spacing: -.015em; margin: 8px 0 6px; }
+h1 em { color: var(--signal); font-style: italic; }
+.sub { color: var(--ink-2); max-width: 600px; font-size: 15px; }
+.ecns { display: grid; grid-template-columns: repeat(3, 210px); gap: 10px; }
+.ecn { all: unset; cursor: pointer; display: block; padding: 12px 14px 14px; border: 1.5px solid var(--ink); background: var(--card); position: relative; transition: transform .25s, box-shadow .25s, background .25s; }
+.ecn:hover { transform: translate(-2px, -2px); box-shadow: 3px 3px 0 var(--ink); }
+.ecn:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+.ecn small { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; color: var(--ink-3); display: block; margin-bottom: 6px; }
+.ecn span { font-size: 13.5px; line-height: 1.3; display: block; font-weight: 500; }
+.ecn[aria-pressed="true"] { background: var(--ink); color: var(--paper); box-shadow: 3px 3px 0 var(--signal); transform: translate(-2px, -2px); }
+.ecn[aria-pressed="true"] small { color: var(--signal); }
+
+/* the thread */
+.thread { position: relative; margin-top: 18px; }
+.thread svg.line { position: absolute; left: 0; right: 0; top: 18px; width: 100%; height: 24px; overflow: visible; }
+.stages { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.15fr); gap: 14px; position: relative; }
+.stage { padding-top: 50px; display: flex; flex-direction: column; position: relative; opacity: 0; transform: translateY(8px); animation: rise .6s cubic-bezier(.2, .7, .2, 1) forwards; }
+.stage:nth-child(1) { animation-delay: .05s } .stage:nth-child(2) { animation-delay: .12s } .stage:nth-child(3) { animation-delay: .19s }
+.stage:nth-child(4) { animation-delay: .26s } .stage:nth-child(5) { animation-delay: .33s } .stage:nth-child(6) { animation-delay: .4s }
+@keyframes rise { to { opacity: 1; transform: none; } }
+.card { background: var(--card); border: 1.5px solid var(--rule); padding: 12px 13px 14px; min-height: 172px; height: 100%; transition: border-color .4s, box-shadow .4s, background .4s; }
+.stage.hit .card { border-color: var(--ink); box-shadow: 4px 4px 0 var(--signal); }
+.label { font-family: var(--mono); font-size: 10.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3); display: flex; justify-content: space-between; gap: 6px; }
+.stage.hit .label b { color: var(--signal-ink); }
+.label b { font-weight: 600; color: var(--ink-3); font-size: 0; }
+.label b::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid currentColor; }
+.stage.hit .label b::before { background: var(--signal); border-color: var(--signal); }
+.big { font-family: var(--num); font-weight: 300; font-variation-settings: "opsz" 144; font-size: clamp(40px, 3.6vw, 56px); line-height: 1; margin: 10px 0 2px; letter-spacing: -.01em; font-variant-numeric: lining-nums tabular-nums; }
+.stage:not(.hit) .big { color: var(--ink-3); }
+.cap { font-size: 13px; color: var(--ink-2); }
+.from { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { font-family: var(--mono); font-size: 11.5px; padding: 1px 6px; border: 1px solid currentColor; }
+.chip.up { color: var(--signal-ink); background: var(--signal-soft); }
+.chip.calm { color: var(--ink-3); }
+.diff { font-family: var(--mono); font-size: 11.5px; line-height: 1.5; margin-top: 10px; }
+.diff div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.diff .minus { color: var(--ink-3); text-decoration: line-through; }
+.diff .plus { color: var(--signal-ink); }
+.node-dot { position: absolute; top: 12px; left: calc(50% - 12px); width: 24px; height: 24px; border-radius: 50%; background: var(--paper); border: 1.5px solid var(--ink-3); display: grid; place-items: center; font-family: var(--mono); font-size: 10px; color: var(--ink-3); transition: all .35s; z-index: 2; }
+.stage.hit .node-dot { background: var(--signal); border-color: var(--signal); color: #fff; box-shadow: 0 0 0 6px var(--signal-soft); }
+.end .card { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.end .label { color: #a8a291; }
+.end .big { color: var(--signal) !important; font-size: clamp(56px, 5.4vw, 84px); }
+.end:not(.hit) .big { color: #7d786a !important; }
+.end .cap { color: #d8d2c2; }
+.end .node-dot { border-radius: 2px; transform: rotate(45deg); }
+.end.hit .node-dot { background: var(--signal); }
+
+/* mode toggle */
+.modebar { display: flex; align-items: center; gap: 18px; margin: 18px 0 0; }
+.seg { display: inline-flex; border: 1.5px solid var(--ink); background: var(--card); }
+.seg button { all: unset; cursor: pointer; padding: 9px 16px; font-size: 13.5px; font-weight: 500; transition: background .2s, color .2s; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.seg button:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.modenote { font-size: 13.5px; color: var(--ink-2); max-width: 640px; }
+
+/* lower half */
+.lower { display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); gap: 34px; margin-top: 16px; padding-top: 16px; border-top: 1.5px solid var(--ink); }
+h2 { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; font-weight: 500; margin: 0 0 12px; color: var(--ink-2); display: flex; justify-content: space-between; align-items: center; }
+.brief { font-family: var(--num); font-weight: 300; font-variation-settings: "opsz" 24; font-size: clamp(15.5px, 1.15vw, 17.5px); line-height: 1.45; color: var(--ink); font-variant-numeric: lining-nums; border-left: 3px solid var(--signal); padding-left: 16px; }
+.brief p { margin: 0 0 .6em; }
+.byline { font-family: var(--mono); font-size: 11px; color: var(--ink-3); margin-top: 6px; }
+.toggle { all: unset; cursor: pointer; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; border: 1px solid var(--ink-2); padding: 3px 8px; }
+.toggle:focus-visible { outline: 2px solid var(--signal); }
+.days { display: grid; gap: 6px; }
+.day { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 8px; }
+.day b { font-family: var(--mono); font-size: 11px; font-weight: 500; color: var(--ink-2); }
+.day svg { width: 100%; height: 26px; display: block; overflow: visible; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 14px; font-size: 12.5px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.legend .ring { background: transparent; border: 2px solid var(--signal); width: 12px; height: 12px; }
+details { margin-top: 16px; border-top: 1px solid var(--rule); padding-top: 12px; }
+summary { cursor: pointer; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); }
+.drawer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 34px; margin-top: 14px; }
+table { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: 12px; }
+th, td { text-align: right; padding: 5px 8px; border-bottom: 1px solid var(--rule); }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 500; color: var(--ink-3); }
+.rules { font-family: var(--mono); font-size: 12px; columns: 2; color: var(--ink-2); }
+.rules div { break-inside: avoid; padding: 2px 0; }
+.rules .new { color: var(--signal-ink); }
+footer { margin-top: 16px; font-family: var(--mono); font-size: 11px; color: var(--ink-3); display: flex; justify-content: space-between; }
+@media (max-width: 1100px) {
+  header { grid-template-columns: 1fr; } .ecns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stages { grid-template-columns: repeat(3, minmax(0, 1fr)); } .thread svg.line { display: none; }
+  .lower, .drawer { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } .stage { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="kicker"><i></i>Internal offering · working demo · synthetic data</div>
+      <h1>Variant-to-<em>Sequence</em></h1>
+      <div class="sub">One data thread from product rules to the assembly line. Change a rule and watch it travel through configurations, mix, slots and the line sequence, with the supplier call-offs it costs.</div>
+    </div>
+    <nav class="ecns" id="ecns" aria-label="Product changes"></nav>
+  </header>
+
+  <section class="thread" aria-label="Planning chain">
+    <svg class="line" id="line" preserveAspectRatio="none"></svg>
+    <div class="stages" id="stages"></div>
+  </section>
+
+  <div class="modebar">
+    <div class="seg" role="group" aria-label="Replan mode">
+      <button id="m-free" aria-pressed="true">Free replan</button>
+      <button id="m-lock" aria-pressed="false">Lock valid orders</button>
+    </div>
+    <div class="modenote" id="modenote"></div>
+  </div>
+
+  <section class="lower">
+    <div>
+      <h2>Planner briefing <span style="color:var(--ink-3)">drafted by Claude from the numbers above</span></h2>
+      <div class="brief" id="brief"></div>
+    </div>
+    <div>
+      <h2><span id="linetitle">The line this week</span><button class="toggle" id="ba">show before</button></h2>
+      <div class="days" id="days"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </section>
+
+  <details>
+    <summary>Option mix against target · full rule set</summary>
+    <div class="drawer">
+      <table id="mixtable"></table>
+      <div class="rules" id="rules"></div>
+    </div>
+  </details>
+
+  <footer><span>product rules → configuration generator → mix optimiser → slot planner → sequencer</span><span id="foot"></span></footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString("en-US");
+const PEARL = { P3: "var(--ev)", R3: "var(--carbon)", R2: "var(--sunroof)", A2: "var(--pilot)" };
+const PEARL_NAME = { P3: "electric", R3: "carbon roof", R2: "sunroof", A2: "highway pilot" };
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+const opts = id => id.split("|")[2].split("-");
+let D, cur = 0, mode = "free", showBefore = false;
+
+function numbers(sc) {
+  const imp = mode === "lock" ? sc.impact_locked : sc.impact;
+  const replaced = imp.orders.replaced;
+  return {
+    imp,
+    rules: sc.rules_added.length + sc.rules_removed.length,
+    configs: imp.configs, invalid: imp.invalid_plan_configs.cars,
+    gapB: imp.mix.gap_before, gapA: imp.mix.gap_after, replaced,
+    slots: replaced + imp.slots.kept_cars_moved_day,
+    line: replaced + imp.sequence.kept_cars_resequenced,
+    calloffs: imp.call_off_changes,
+  };
+}
+
+function stagesFor(sc) {
+  const n = numbers(sc), c = n.configs;
+  const dc = c.added + c.removed;
+  return [
+    { k: "01", t: "Product rules", hit: true, big: n.rules, cap: n.rules === 1 ? "rule changed" : "rule lines changed",
+      extra: sc.rules_removed.map(r => `<div class="minus">− ${r}</div>`).join("") + sc.rules_added.map(r => `<div class="plus">+ ${r}</div>`).join("") },
+    { k: "02", t: "Configurations", hit: dc > 0, big: c.buildable_after, cap: "buildable configurations",
+      from: `from ${fmt(c.buildable_before)}`, chips: [c.added && `+${c.added}`, c.removed && `−${c.removed}`].filter(Boolean) },
+    { k: "03", t: "Mix", hit: n.replaced > 0 || n.invalid > 0 || n.gapA !== n.gapB, big: n.gapA, cap: "cars off the option-mix target",
+      from: `from ${fmt(n.gapB)}`, chips: [n.invalid && `${n.invalid} cars no longer buildable`, n.replaced && `${n.replaced} replaced`].filter(Boolean) },
+    { k: "04", t: "Slots", hit: n.slots > 0, big: n.slots, cap: "cars to (re)slot into the week",
+      from: "600 cars · 5 days", chips: n.imp.slots.kept_cars_moved_day ? [`${n.imp.slots.kept_cars_moved_day} moved day`] : [] },
+    { k: "05", t: "Sequence", hit: n.line > 0, big: n.line, cap: "line positions changed",
+      from: "120 cars a day", chips: n.imp.sequence.kept_cars_resequenced ? [`${n.imp.sequence.kept_cars_resequenced} resequenced`] : [] },
+    { k: "→", t: "Supplier call-offs", end: true, hit: n.calloffs > 0, big: n.calloffs, cap: "call-off changes this change costs" },
+  ];
+}
+
+function renderStages() {
+  const sc = D.scenarios[cur], st = stagesFor(sc);
+  $("stages").innerHTML = st.map(s => `
+    <div class="stage ${s.hit ? "hit" : ""} ${s.end ? "end" : ""}">
+      <div class="node-dot">${s.end ? "" : s.k}</div>
+      <div class="card">
+        <div class="label"><span>${s.t}</span><b title="${s.hit ? "affected" : "untouched"}">${s.hit ? "affected" : "untouched"}</b></div>
+        <div class="big" data-to="${s.big}">0</div>
+        <div class="cap">${s.cap}</div>
+        ${s.from ? `<div class="from"><span>${s.from}</span>${(s.chips || []).map(ch => `<span class="chip ${s.hit ? "up" : "calm"}">${ch}</span>`).join("")}</div>` : ""}
+        ${s.extra ? `<div class="diff">${s.extra}</div>` : ""}
+      </div>
+    </div>`).join("");
+  document.querySelectorAll(".big").forEach(countUp);
+  drawLine(st);
+}
+
+function countUp(el) {
+  const to = +el.dataset.to, t0 = performance.now(), dur = 700;
+  const step = t => { const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3); el.textContent = fmt(Math.round(to * e)); if (p < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+
+function drawLine(st) {
+  // the thread runs through every node; the orange pulse travels as far as the change reaches
+  const nodes = [...document.querySelectorAll(".node-dot")], box = $("line").parentElement.getBoundingClientRect();
+  const xs = nodes.map(n => { const r = n.getBoundingClientRect(); return r.left + r.width / 2 - box.left; });
+  const reach = st.reduce((last, s, i) => s.hit ? i : last, 0);
+  const w = box.width;
+  $("line").setAttribute("viewBox", `0 0 ${w} 24`);
+  const full = `M ${xs[0]} 12 L ${xs[xs.length - 1]} 12`, len = xs[reach] - xs[0];
+  $("line").innerHTML = `
+    <path d="${full}" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="2 5" fill="none"/>
+    <path id="pulse" d="M ${xs[0]} 12 L ${xs[reach]} 12" stroke="var(--signal)" stroke-width="3.5" fill="none"
+      stroke-dasharray="${len} ${len}" stroke-dashoffset="${len}" stroke-linecap="round"/>
+    <circle id="spark" r="5" cy="12" cx="${xs[0]}" fill="var(--signal)"/>`;
+  const pulse = $("pulse"), spark = $("spark"), t0 = performance.now(), dur = 300 + 260 * reach;
+  const step = t => { const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 2.2);
+    pulse.setAttribute("stroke-dashoffset", len * (1 - e)); spark.setAttribute("cx", xs[0] + len * e);
+    if (p < 1) requestAnimationFrame(step); else spark.setAttribute("r", reach === xs.length - 1 ? 7 : 5); };
+  requestAnimationFrame(step);
+}
+
+function renderLine() {
+  const sc = D.scenarios[cur];
+  const state = showBefore ? sc.before : (mode === "lock" ? sc.after_locked : sc.after);
+  const added = new Set(showBefore ? [] : (mode === "lock" ? sc.added_locked : sc.added));
+  $("linetitle").textContent = showBefore ? "The line before the change" : `The line after the change · ${mode === "lock" ? "locked" : "free"} replan`;
+  $("ba").textContent = showBefore ? "show after" : "show before";
+  $("days").innerHTML = state.days.map((ids, d) => {
+    const step = 1000 / ids.length;
+    const pearls = ids.map((id, i) => {
+      const o = opts(id), key = D.watch.find(w => o.includes(w));
+      const x = step * i + step / 2, fill = key ? PEARL[key] : "var(--plain)";
+      const ring = added.has(id) ? `<circle cx="${x}" cy="13" r="6.2" fill="none" stroke="var(--signal)" stroke-width="2"/>` : "";
+      return `${ring}<circle cx="${x}" cy="13" r="3.3" fill="${fill}"><title>${id.split("|").slice(0, 3).join(" · ")}</title></circle>`;
+    }).join("");
+    return `<div class="day"><b>${DAYS[d]}</b><svg viewBox="0 0 1000 26" preserveAspectRatio="none" role="img" aria-label="${DAYS[d]} sequence">
+      <line x1="0" y1="13" x2="1000" y2="13" stroke="var(--rule)" stroke-width="1"/>${pearls}</svg></div>`;
+  }).join("");
+  const nAdded = added.size;
+  $("legend").innerHTML = D.watch.map(w => `<span><i style="background:${PEARL[w]}"></i>${PEARL_NAME[w]}</span>`).join("")
+    + `<span><i style="background:var(--plain)"></i>none of these</span>`
+    + (nAdded ? `<span><i class="ring"></i>${nAdded} cars new in the plan</span>` : "");
+}
+
+function renderText() {
+  const sc = D.scenarios[cur], n = numbers(sc);
+  $("brief").innerHTML = sc.briefing.split(/\n+/).map(p => `<p>${p}</p>`).join("");
+  $("modenote").textContent = mode === "lock"
+    ? `Every still-valid order stays put; only cars the change made unbuildable are replaced. ${fmt(n.calloffs)} call-off changes, mix gap ${fmt(n.gapA)}.`
+    : `The optimiser may rebuild the week to stay close to the option-mix target. ${fmt(n.calloffs)} call-off changes, mix gap ${fmt(n.gapA)}.`;
+  const touched = new Set([...sc.new_options, ...[...sc.rules_added, ...sc.rules_removed].flatMap(r => r.split(/[\s,]+/))]);
+  const all = Object.values(D.families).flatMap(f => Object.keys(f)).concat(sc.new_options);
+  const show = [...new Set(all.filter(o => touched.has(o)))];
+  const sum = (st, o) => st.option_counts[o] || 0;
+  const target = (st, o) => Object.values(st.targets).reduce((a, g) => a + (g[o] || 0), 0);
+  const after = mode === "lock" ? sc.after_locked : sc.after;
+  const names = Object.assign({}, ...Object.values(D.families));
+  $("mixtable").innerHTML = `<tr><th>option</th><th>target</th><th>before</th><th>after</th></tr>` +
+    show.map(o => `<tr><td>${o} ${names[o] || ""}</td><td>${fmt(target(after, o))}</td><td>${fmt(sum(sc.before, o))}</td><td>${fmt(sum(after, o))}</td></tr>`).join("");
+  const added = new Set(sc.rules_added);
+  $("rules").innerHTML = D.base_rules.filter(r => !sc.rules_removed.includes(r)).concat(sc.rules_added)
+    .map(r => `<div class="${added.has(r) ? "new" : ""}">${added.has(r) ? "+ " : ""}${r}</div>`).join("");
+  $("foot").textContent = sc.change;
+}
+
+function render() { renderStages(); renderLine(); renderText(); }
+
+function setMode(m) { mode = m; $("m-free").setAttribute("aria-pressed", m === "free"); $("m-lock").setAttribute("aria-pressed", m === "lock"); render(); }
+
+fetch("thread.json").then(r => r.json()).then(data => {
+  D = data;
+  $("ecns").innerHTML = D.scenarios.map((s, i) =>
+    `<button class="ecn" aria-pressed="${i === 0}" data-i="${i}"><small>CHANGE ${String(i + 1).padStart(2, "0")}</small><span>${s.change.replace(/^MY27\.1\s*/, "")}</span></button>`).join("");
+  $("ecns").addEventListener("click", e => { const b = e.target.closest(".ecn"); if (!b) return;
+    cur = +b.dataset.i; document.querySelectorAll(".ecn").forEach(x => x.setAttribute("aria-pressed", x === b)); showBefore = false; render(); });
+  $("m-free").onclick = () => setMode("free");
+  $("m-lock").onclick = () => setMode("lock");
+  $("ba").onclick = () => { showBefore = !showBefore; renderLine(); };
+  addEventListener("resize", () => drawLine(stagesFor(D.scenarios[cur])));
+  render();
+});
+</script>
+</body>
+</html>

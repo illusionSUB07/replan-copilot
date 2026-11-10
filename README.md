@@ -43,3 +43,13 @@ uv run --group omniverse python -m omniverse.perceive FRAMES_DIR    # FRAMES_DIR
 The replay's `outcome` carries each car's times (`body_in`, `paint_in`, `paint_line`, `ready`, `assembly_in`, `finished`, `plan_time`); for cars moved by a release, plan position and time refer to the final plan.
 
 All data, costs and plant parameters are synthetic.
+
+## Variant-to-Sequence
+
+`thread/` chains five planning stages on synthetic data: product rules, configuration generator, mix optimiser (CP-SAT), slot planner and the line sequencer. A product change is pushed through all five and measured, in two modes (free replan vs lock valid orders), and Claude writes a planner briefing for each change.
+
+```bash
+uv run python -m thread                                # impact of each change as JSON
+uv run python -m thread.export web/thread.json --brief # data for the page (briefings call Bedrock)
+python3 -m http.server -d web                          # open http://localhost:8000/thread.html
+```
