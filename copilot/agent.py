@@ -17,15 +17,18 @@ Several times a day you check the line and decide whether to release a resequenc
 
 Costs (EUR): out-of-sequence car at the line {OUT_OF_SEQUENCE}, car carried over to tomorrow {CARRY_OVER},
 supplier call-off change {CALL_OFF_CHANGE}, or {EMERGENCY_CHANGE} if the car is due within {FREEZE} minutes (freeze window).
-Predictions only use disruptions known so far. Supplier delay estimates can still be revised, and every release
-changes call-offs again, so releasing too early on uncertain information can cost twice.
+Only these costs count; how late cars are does not. Predictions only use disruptions known so far.
+In this plant, an open supplier delay is revised upward about half the time, by 60, 120 or 180 minutes, usually
+about an hour before the first estimate expires. Decide on expected cost, not on the worst case: compare wait vs
+resequence with evaluate_options at delay_growth_min 0 and at the possible slips, weight them by how likely they are,
+and release when resequencing is cheaper in expectation. A release that changes nothing is pointless.
 
 Use get_status and evaluate_options, then either call release_resequence or keep the plan. Finish with one short sentence
 stating your decision and the main reason."""
 
 
 def make_policy(disruptions, verbose=True):
-    client = AnthropicBedrockMantle(aws_region=REGION, aws_profile=PROFILE)
+    client = AnthropicBedrockMantle(aws_region=REGION, aws_profile=PROFILE, max_retries=6)
     history = []
 
     def policy(now, rows):
@@ -46,10 +49,14 @@ def make_policy(disruptions, verbose=True):
             })
 
         @beta_tool
-        def evaluate_options() -> str:
-            """Sandbox comparison of predicted full-day cost: keep the plan ('wait') vs release a resequenced plan."""
+        def evaluate_options(delay_growth_min: int = 0) -> str:
+            """Sandbox comparison of predicted full-day cost: keep the plan ('wait') vs release a resequenced plan.
+
+            Args:
+                delay_growth_min: Stress test, assume every open supplier delay slips by this many minutes.
+            """
             return json.dumps({name: {k: v for k, v in c.items() if k not in ("avg_delay_min", "max_delay_min")}
-                               for name, c in evaluate(rows, disruptions, now).items()})
+                               for name, c in evaluate(rows, disruptions, now, delay_growth_min).items()})
 
         @beta_tool
         def release_resequence(reason: str) -> str:
@@ -76,7 +83,7 @@ def make_policy(disruptions, verbose=True):
         if final.stop_reason == "refusal":
             raise RuntimeError(f"model refused at {clock(now)}")
         text = " ".join(b.text for b in final.content if b.type == "text").strip()
-        history.append(f"- {clock(now)}: {'RELEASED' if decision['release'] else 'kept plan'} ({text})")
+        history.append(f"- {clock(now)}: {'RELEASED' if decision['release'] else 'kept plan'} ({text[-300:]})")
         if verbose:
             print(history[-1])
         return decision["release"]

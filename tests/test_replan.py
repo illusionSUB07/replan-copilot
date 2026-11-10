@@ -7,7 +7,7 @@ from copilot.solver import sequence
 DAY = 1
 SEQ, _ = sequence(daily_package(DAY), time_limit=5)
 ROWS = plan(SEQ, DAY)
-DIS = bad_day(ROWS)
+DIS = bad_day(ROWS, 0)
 
 
 def test_known_filters_by_time():
@@ -42,3 +42,13 @@ def test_policies_differ_on_bad_day_and_match_on_calm():
     calm_never, _ = run_day(ROWS, [], lambda n, r: False, checks)
     calm_always, _ = run_day(ROWS, [], lambda n, r: True, checks)
     assert calm_never["total_eur"] == calm_always["total_eur"] == 0
+
+
+def test_delay_growth_only_slips_open_supplier_delays():
+    now = 10**9
+    grown = known(DIS, now, 60)
+    assert grown == known(DIS, now)  # all delays already over, nothing to slip
+    early = DAY * SHIFT_LEN
+    open_ = [d for d in known(DIS, early, 60) if d["type"] == "supplier_late"]
+    base = [d for d in known(DIS, early) if d["type"] == "supplier_late"]
+    assert [d["until"] - b["until"] for d, b in zip(open_, base)] == [60] * len(base)

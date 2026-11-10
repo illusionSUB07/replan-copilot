@@ -10,8 +10,11 @@ OUT_OF_SEQUENCE = 150     # car reaches the line in a different order than suppl
 CARRY_OVER = 900          # car not built today
 
 
-def known(disruptions, now):
-    return [d for d in disruptions if d["known_at"] <= now]
+def known(disruptions, now, delay_growth=0):
+    # delay_growth: stress test, open supplier delays slip by this many minutes
+    seen = [d for d in disruptions if d["known_at"] <= now]
+    return [{**d, "until": d["until"] + delay_growth} if d["type"] == "supplier_late" and d["until"] > now else d
+            for d in seen]
 
 
 def resequence(rows, disruptions, now):
@@ -64,9 +67,9 @@ def cost(rows, disruptions, normal=0, emergency=0):
             "cost_eur": eur, "total_eur": sum(eur.values())}
 
 
-def evaluate(rows, disruptions, now):
-    """Predicted day cost for 'wait' vs 'resequence', using only what is known at `now`."""
-    seen = known(disruptions, now)
+def evaluate(rows, disruptions, now, delay_growth=0):
+    """Predicted day cost for 'wait' vs 'resequence' from what is known at `now`, optionally with slipped supplier delays."""
+    seen = known(disruptions, now, delay_growth)
     new = resequence(rows, disruptions, now)
     n, e = call_off_changes(rows, new, now)
     return {"wait": cost(rows, seen), "resequence": cost(new, seen, n, e)}
@@ -83,6 +86,30 @@ def run_day(rows, disruptions, policy, checks):
             normal, emergency, rows = normal + n, emergency + e, new
             log.append((now, n, e))
     return cost(rows, disruptions, normal, emergency), log
+
+
+def greedy_rule(disruptions):
+    def policy(now, rows):
+        e = evaluate(rows, disruptions, now)
+        return e["resequence"]["total_eur"] < e["wait"]["total_eur"]
+    return policy
+
+
+def robust_rule(disruptions, growth=120):
+    def policy(now, rows):
+        return all(e["resequence"]["total_eur"] < e["wait"]["total_eur"]
+                   for e in (evaluate(rows, disruptions, now, g) for g in (0, growth)))
+    return policy
+
+
+def expected_rule(disruptions, slip_p=0.5, slips=(60, 120, 180)):
+    # weighs "estimate holds" against the average slip instead of guarding against the worst case
+    def policy(now, rows):
+        ev = lambda g: evaluate(rows, disruptions, now, g)
+        base, slipped = ev(0), [ev(g) for g in slips]
+        exp = lambda k: (1 - slip_p) * base[k]["total_eur"] + slip_p * sum(e[k]["total_eur"] for e in slipped) / len(slips)
+        return exp("resequence") < exp("wait")
+    return policy
 
 
 def day_checks(day, every=120):
