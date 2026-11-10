@@ -17,6 +17,12 @@ def stage(tmp_path_factory):
     return Usd.Stage.Open(str(out))
 
 
+def test_scene_has_lights(stage):
+    from pxr import UsdLux
+    assert UsdLux.DomeLight(stage.GetPrimAtPath("/World/Lights/Dome"))
+    assert UsdLux.DistantLight(stage.GetPrimAtPath("/World/Lights/Sun"))
+
+
 def test_cars_ghosts_and_cameras(stage):
     assert stage and UsdGeom.GetStageUpAxis(stage) == UsdGeom.Tokens.z
     assert len(stage.GetPrimAtPath("/World/Cars").GetChildren()) == 120

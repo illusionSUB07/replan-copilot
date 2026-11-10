@@ -3,7 +3,7 @@ import json
 import sys
 from pathlib import Path
 
-from pxr import Gf, Sdf, Usd, UsdGeom
+from pxr import Gf, Sdf, Usd, UsdGeom, UsdLux
 
 CAR = (4.5, 1.9, 1.3)
 PITCH = 6.0                                   # slot / buffer spot spacing
@@ -94,12 +94,20 @@ def build(replay, out):
     # cameras look along local -Z; rotate X by 80 (slight tilt down) then Z to face along the flow
     for name, pos, yaw in (("body_to_paint", (GATES["paint_in"] - 6, 0, 5), -90),
                            ("paint_to_assembly", (GATES["assembly_in"] - 6, 0, 5), -90),
-                           ("end_of_line", (GATES["finished"] + 12, 0, 5), 90)):
+                           ("end_of_line", (GATES["finished"] + 12, 0, 5), 90),
+                           ("overview", ((BODY_X[0] + LINE_X[1]) / 2, -450, 520), 0)):
         cam = UsdGeom.Camera.Define(stage, f"/World/Cameras/{name}")
         cam.AddTranslateOp().Set(Gf.Vec3d(*pos))
-        cam.AddRotateXYZOp().Set(Gf.Vec3f(80, 0, yaw))
-        cam.CreateFocalLengthAttr(18)
+        cam.AddRotateXYZOp().Set(Gf.Vec3f(40 if name == "overview" else 80, 0, yaw))
+        cam.CreateFocalLengthAttr(12 if name == "overview" else 18)
         cam.CreateClippingRangeAttr(Gf.Vec2f(0.1, 2000))
+
+    # headless renders get no default light, so the scene brings its own
+    UsdLux.DomeLight.Define(stage, "/World/Lights/Dome").CreateIntensityAttr(250)
+    sun = UsdLux.DistantLight.Define(stage, "/World/Lights/Sun")
+    sun.CreateIntensityAttr(1200)
+    box(stage, "/World/Ground", ((BODY_X[0] + LINE_X[1]) / 2, 0, -0.2), (1400, 400, 0.1), (0.18, 0.19, 0.21))
+    sun.AddRotateXYZOp().Set(Gf.Vec3f(-40, 0, 30))
 
     z = CAR[2] / 2
     for oid, c in cars.items():
