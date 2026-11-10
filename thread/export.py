@@ -41,7 +41,7 @@ def export(brief=False):
         rules_b, rules_a = set(rule_text(base)), set(rule_text(p))
         sc = {"name": name, "change": p["version"], "rules_added": sorted(rules_a - rules_b), "rules_removed": sorted(rules_b - rules_a),
               "new_options": sorted(set(o for f in p["families"].values() for o in f) - set(o for f in base["families"].values() for o in f)),
-              "impact": imp, "before": stage(base, before), "after": stage(p, after),
+              "impact": imp, "impact_locked": analyse(name, lock=True)[0], "before": stage(base, before), "after": stage(p, after),
               "replaced": sorted(set(before["orders"]) - set(after["orders"])), "added": sorted(set(after["orders"]) - set(before["orders"]))}
         if brief:
             from .brief import briefing

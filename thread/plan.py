@@ -26,8 +26,8 @@ def solve(m, seconds=10):
     return s
 
 
-def mix(product, pools, previous=None):
-    """{(model, market, config): quantity}. Hits option-mix targets per model/market within weekly supplier caps."""
+def mix(product, pools, previous=None, lock=False):
+    """{(model, market, config): quantity}. Hits option-mix targets per model/market within weekly supplier caps; lock keeps every still-valid car."""
     m = cp_model.CpModel()
     q = {(mm, k, c): m.new_int_var(0, VOLUME[(mm, k)], "") for (mm, k), rows in pools.items() for c, _ in rows}
     cost = []
@@ -45,6 +45,8 @@ def mix(product, pools, previous=None):
     for o, cap in WEEKLY_CAP.items():
         m.add(sum(v for key, v in q.items() if o in key[2]) <= cap)
     for key, before in (previous or {}).items():  # stability: penalise every car the new plan takes away
+        if key in q and lock:
+            m.add(q[key] >= before)
         if key in q:
             cut = m.new_int_var(0, before, "")
             m.add(before - q[key] <= cut)
@@ -93,8 +95,8 @@ def sequence_days(days, previous=None, seconds=5):
     return out
 
 
-def run(product, pools, previous=None):
-    q = mix(product, pools, previous and previous["mix"])
+def run(product, pools, previous=None, lock=False):
+    q = mix(product, pools, previous and previous["mix"], lock)
     ids = orders(q)
     days = slot(ids, previous and previous["days"])
     return {"mix": q, "orders": ids, "days": days, "sequence": sequence_days(days, previous and previous["sequence"])}

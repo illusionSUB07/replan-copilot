@@ -12,11 +12,13 @@ configurations -> weekly production mix -> daily slots -> line sequence. Every c
 position changes triggers a supplier call-off change. You get one product change and its measured impact.
 Write 4 to 6 plain sentences, no headings or bullets: what changed, what it forces in the plan (with the numbers),
 what the plan did about it, anything that blocks the change (capacities, rules), and one concrete recommendation.
+impact is the free replan; impact_locked keeps every still-valid order and only replaces invalid cars. Compare
+both when they differ: fewer call-off changes versus a mix closer to target.
 Only use numbers that are in the input."""
 
 
 def briefing(sc):
-    keep = {k: sc[k] for k in ("change", "rules_added", "rules_removed", "new_options", "impact")}
+    keep = {k: sc[k] for k in ("change", "rules_added", "rules_removed", "new_options", "impact", "impact_locked")}
     names = {o: d for f in scenario(sc["name"])["families"].values() for o, d in f.items()}
     words = {w.strip(",") for line in sc["rules_added"] + sc["rules_removed"] for w in line.split()}
     opts = (set(sc["new_options"]) | words) & set(names)  # option codes only, not markets or models

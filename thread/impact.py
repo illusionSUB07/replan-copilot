@@ -1,6 +1,8 @@
 """What one product change does to every stage of the chain, measured against the plan before it."""
+import json
 from bisect import bisect_left
 from collections import Counter
+from pathlib import Path
 
 from .congen import buildable, generate
 from .plan import mix_gap, run
@@ -44,9 +46,25 @@ def impact(before_product, before, after_product, after, pools_before, pools_aft
     }
 
 
-def analyse(name):
+BASE_PLAN = Path(".cache/thread_base.json")
+
+
+def base_plan(product, pools):
+    # parallel CP-SAT is not reproducible, so the base week is planned once and every scenario starts from it
+    if BASE_PLAN.exists():
+        d = json.loads(BASE_PLAN.read_text())
+        return {"mix": {tuple(k.split("|")[:2]) + (tuple(k.split("|")[2].split("-")),): v for k, v in d["mix"].items()},
+                "orders": d["orders"], "days": d["days"], "sequence": {int(k): v for k, v in d["sequence"].items()}}
+    r = run(product, pools)
+    BASE_PLAN.parent.mkdir(exist_ok=True)
+    BASE_PLAN.write_text(json.dumps({"mix": {f"{a}|{b}|{'-'.join(c)}": v for (a, b, c), v in r["mix"].items()},
+                                     "orders": r["orders"], "days": r["days"], "sequence": r["sequence"]}))
+    return r
+
+
+def analyse(name, lock=False):
     p0, p1 = scenario("base"), scenario(name)
     pools0, pools1 = generate(p0), generate(p1)
-    before = run(p0, pools0)
-    after = run(p1, pools1, previous=before)
+    before = base_plan(p0, pools0)
+    after = run(p1, pools1, previous=before, lock=lock)
     return impact(p0, before, p1, after, pools0, pools1), before, after
