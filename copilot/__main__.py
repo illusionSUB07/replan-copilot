@@ -1,8 +1,9 @@
-"""python -m copilot [--seeds N] [--scenario calm|bad_day] [--agent]"""
+"""python -m copilot [--seeds N] [--scenario calm|bad_day] [--agent] | --export replay.json [--seed N] [--policy P]"""
 import argparse
 import json
 from pathlib import Path
 
+from .export import POLICIES, export
 from .plant import clock, daily_package
 from .replan import day_checks, expected_rule, greedy_rule, robust_rule, run_day
 from .scenarios import SCENARIOS
@@ -32,7 +33,17 @@ def main():
     ap.add_argument("--first", type=int, default=0, help="first seed, to resume an interrupted run")
     ap.add_argument("--scenario", choices=SCENARIOS, default="bad_day")
     ap.add_argument("--agent", action="store_true", help="also run the Claude copilot (calls Bedrock)")
+    ap.add_argument("--export", metavar="FILE", help="write one day as replay JSON for web/index.html")
+    ap.add_argument("--seed", type=int, default=4, help="seed for --export")
+    ap.add_argument("--policy", choices=POLICIES, default="expected", help="policy for --export")
     args = ap.parse_args()
+
+    if args.export:
+        rows = plan(cached_sequence(args.seed), DAY)
+        out = export(rows, SCENARIOS[args.scenario](rows, args.seed), day_checks(DAY), DAY, args.policy)
+        Path(args.export).write_text(json.dumps({"seed": args.seed, "scenario": args.scenario, **out}))
+        print(f"wrote {args.export}: {out['policy']} {out['final']['policy']['total_eur']} € vs never replan {out['final']['never']['total_eur']} €")
+        return
 
     totals = {}
     checks = day_checks(DAY)

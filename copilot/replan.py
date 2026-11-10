@@ -75,16 +75,19 @@ def evaluate(rows, disruptions, now, delay_growth=0):
     return {"wait": cost(rows, seen), "resequence": cost(new, seen, n, e)}
 
 
-def run_day(rows, disruptions, policy, checks):
+def run_day(rows, disruptions, policy, checks, trace=None):
     """Ask `policy(now, rows)` at each check; on True release the resequenced plan. Returns final cost and log."""
     normal = emergency = 0
     log = []
     for now in checks:
+        seen = rows
         if policy(now, rows):
             new = resequence(rows, disruptions, now)
             n, e = call_off_changes(rows, new, now)
             normal, emergency, rows = normal + n, emergency + e, new
             log.append((now, n, e))
+        if trace is not None:  # (check time, plan the policy saw, plan after the decision)
+            trace.append((now, seen, rows))
     return cost(rows, disruptions, normal, emergency), log
 
 
@@ -102,13 +105,18 @@ def robust_rule(disruptions, growth=120):
     return policy
 
 
-def expected_rule(disruptions, slip_p=0.5, slips=(60, 120, 180)):
+SLIP_P, SLIPS = 0.5, (60, 120, 180)
+
+
+def expected(by_growth, k, slip_p=SLIP_P, slips=SLIPS):
     # weighs "estimate holds" against the average slip instead of guarding against the worst case
+    return (1 - slip_p) * by_growth[0][k]["total_eur"] + slip_p * sum(by_growth[g][k]["total_eur"] for g in slips) / len(slips)
+
+
+def expected_rule(disruptions, slip_p=SLIP_P, slips=SLIPS):
     def policy(now, rows):
-        ev = lambda g: evaluate(rows, disruptions, now, g)
-        base, slipped = ev(0), [ev(g) for g in slips]
-        exp = lambda k: (1 - slip_p) * base[k]["total_eur"] + slip_p * sum(e[k]["total_eur"] for e in slipped) / len(slips)
-        return exp("resequence") < exp("wait")
+        ev = {g: evaluate(rows, disruptions, now, g) for g in (0, *slips)}
+        return expected(ev, "resequence", slip_p, slips) < expected(ev, "wait", slip_p, slips)
     return policy
 
 
